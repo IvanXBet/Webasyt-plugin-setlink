@@ -1,0 +1,211 @@
+<link rel="stylesheet" type="text/css" href="{$wa_app_static_url}plugins/setlink/css/control.css">
+<script type="text/javascript" src="{$wa_url}wa-content/js/ace/ace.js?{$wa->version(true)}"></script>
+<script type="text/javascript" src="{$wa_app_static_url}plugins/setlink/js/gofileupload.js"></script>
+<script type="text/javascript" src="{$wa_app_static_url}plugins/tilesfo/js/fsortable.js"></script>
+<style>
+	.stl-table {
+		width: 100%;
+		
+		box-sizing: content-box; 
+	}
+
+	.stl-table th, .stl-table td {
+		border: 1px solid #ddd;
+		padding: 8px;
+		text-align: left;
+	}
+
+	.stl-img {
+		max-width: 100px;
+		max-height: 100px;
+	}
+	.stl-table th:nth-child(1){
+		width: 10px;
+	}
+	.stl-table th:nth-child(2),
+	.stl-table td:nth-child(2) {
+		width: 100px; 
+	}
+
+	.stl-table th:nth-child(3),
+	.stl-table td:nth-child(3) {
+		width: 350px; 
+	}
+	.stl-tb-btn-delete {
+		cursor: pointer;
+	}
+
+	.stl-table textarea {
+		width: 90%; 
+		resize: none;
+	}
+
+
+	/* .stl-text-cell:before {
+		content: "Текст: ";
+	}
+
+	.stl-url-cell:before {
+		content: "URL: ";
+	} */
+
+</style>
+
+<h1>Набор карточек-ссылок</h1>
+
+<div class="stl-block">
+    <form id="stl_file_upload_form" action="?plugin=setlink&module=card&action=create" method="POST" enctype="multipart/form-data">
+        <div class="l-dropbox">
+            <a class="l-fileinput-button">
+                <i class="icon16 upload"></i> Перетащите фото
+                <input type="file" name="files[]" multiple="">
+            </a>
+            <span class="gray">или просто перетащите их сюда, чтобы начать загрузку</span>
+        </div>
+        {$wa->csrf()}
+        <div class="dialog width500px height400px" id="l_upload_notification">
+            <div class="dialog-background"></div>
+            <div class="dialog-window">
+                <div class="l-upload-list"></div>
+                <div class="dialog-buttons">
+                    <div class="block float-right" style="padding-top: 22px;">
+                        <a href="#" class="l-cancel hint cancel">Отмена</a>
+                    </div>
+                    <div style="display:none; padding-top: 25px;" class="l-upload-errors block errormsg">
+                        Некоторые файлы загружены с ошибками
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="stl-dt-wrap">
+        <table class="stl-table zebra mt15" data-Url="?plugin=pdd&module=file&action=listCat">
+            <thead>
+                <tr>
+					<th></th>
+                    <th>Фото</th>
+                    <th>Текст</th>
+					<th>URL</th>
+					<th width="1">Сохранить</th>
+                    <th width="1">Удалить</th>
+                </tr>
+            </thead>
+            <tbody id="sortable"></tbody>
+        </table>
+    </div>
+	
+
+
+<script type="text/javascript">
+(function($) {
+	$.setlink = {
+		formUpload: null,
+		init: function() {
+			this.formUpload = $('#stl_file_upload_form');
+			this.initFormUpload();
+			this.initTable();
+			this.initSort();
+		},
+
+		initFormUpload: function() {
+			const self = this;
+			this.formUpload.goFileUpload(function(jData) {
+				self.initTable();
+				return;
+			})
+		},
+
+		initTable: function() {
+			var self = this;
+			$.post('?plugin=setlink&module=card&action=list', function(jData) {
+				console.log(jData.data);
+				var tableBody = $('.stl-table tbody'); 
+				tableBody.empty();
+				$.each(jData.data, function(index, card) {
+					var row = $('<tr id="' + card.id + '">'); 
+					row.append('<td> <i class="icon16 sort stl-tb-btn-sort"></i> </td>'); 
+					row.append('<td> <img src="' + card.photo_url + '" class="stl-img"/> </td>'); 
+					row.append('<td class ="stl-text-cell"><textarea name="text" placeholder="Введите текст"> ' + (card.text ? card.text : '') + '</textarea></td>');
+					row.append('<td class ="stl-url-cell"><textarea name="url" placeholder="Введите URL">' + (card.path ? card.path : '') + '</textarea></td>');
+					row.append('<td class="stl-save-cell"><button class="save-btn" disabled>Сохранить</button></td>');
+					row.append('<td style="text-align: center;"> <i class="icon16 delete stl-tb-btn-delete" title="Удалить"></i> </td>'); 
+
+					tableBody.append(row);
+				})
+			});
+
+			
+			$('.stl-table tbody').on('click', '.stl-tb-btn-delete', function() {
+				console.log('123')
+				var cardId = $(this).closest('tr').attr('id');
+				self.deleteCard(cardId);
+			});
+
+				
+			$('.stl-table tbody').on('input', 'textarea[name="text"]', function() {
+				var row = $(this).closest('tr');
+				var saveBtn = row.find('.save-btn');
+				if ($(this).val().trim() !== '') {
+					saveBtn.prop('disabled', false); 
+				} else {
+					saveBtn.prop('disabled', true); 
+				}
+			});
+
+		
+			$('.stl-table tbody').on('click', '.save-btn', function() {
+				var row = $(this).closest('tr');
+				var data = {
+					cardId: row.attr('id'),
+					textValue: row.find('.stl-text-cell textarea').val(),
+					urlValue: row.find('.stl-url-cell textarea').val(),
+				}
+
+				$.post('?plugin=setlink&module=card&action=update', data, function(jData) {
+					var saveBtn = row.find('.save-btn');
+					saveBtn.prop('disabled', true);
+				});
+			});
+
+			
+			$('#sortable').sortable();
+    	
+		},
+
+		deleteCard: function(cardId) {
+			var self = this;
+			var data = {
+				cardId: cardId,
+			}
+			$.post('?plugin=setlink&module=card&action=delete', data, function(jData) {
+				self.initTable();
+			});
+			
+		},
+	
+
+
+		initSort: function() {
+			var self = this;
+			$('#sortable').sortable()
+            $('#sortable').sortable({
+                update: function() {
+					const cards = 'cards= '+$(this).sortable("toArray").join(',');
+                    $.ajax({
+                        method: 'post',
+                        url: '?plugin=setlink&module=card&action=sort',
+                        data: cards,
+                    }, 'json');
+                }
+            });
+		},
+		
+	}
+
+})(jQuery);
+$(document).ready(function() {
+	$.setlink.init();
+});
+</script>
